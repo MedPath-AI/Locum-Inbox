@@ -27,7 +27,10 @@ export function formatDisplayDomain(domain: string): string {
 }
 
 export function formatDisplayEmail(email: string): string {
-	return email.replace(/\blocumdoctor\.sg\b/gi, "LocumDoctor.sg");
+	return email.replace(/\b([^@\s<>]+)@locumdoctor\.sg\b/gi, (_match, localPart: string) => {
+		const displayLocalPart = localPart.charAt(0).toUpperCase() + localPart.slice(1);
+		return `${displayLocalPart}@LocumDoctor.sg`;
+	});
 }
 
 /**
