@@ -40,6 +40,8 @@ export interface Email {
 	email_references?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	send_status?: "queued" | "sending" | "sent" | "failed" | null;
+	send_error?: string | null;
 	attachments?: Attachment[];
 	snippet?: string | null;
 	// Thread aggregate fields (only present in threaded list view)

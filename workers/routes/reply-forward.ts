@@ -3,8 +3,6 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import type { Context } from "hono";
-import { sendEmail } from "../email-sender";
-import { storeAttachments } from "../lib/attachments";
 import type { EmailFull } from "../lib/schemas";
 import {
 	validateSender,
@@ -15,11 +13,10 @@ import {
 	resolveOriginalEmail,
 } from "../lib/email-helpers";
 import { SendEmailRequestSchema } from "../lib/schemas";
-import { Folders } from "../../shared/folders";
+import { sendRecordedEmail } from "../lib/send-service";
 import type { MailboxContext } from "../lib/mailbox";
 
 type AppContext = Context<MailboxContext>;
-type RateLimitStub = { checkSendRateLimit: () => Promise<string | null> };
 
 export async function handleReplyEmail(c: AppContext) {
 	const mailboxId = c.req.param("mailboxId") ?? "";
@@ -46,49 +43,38 @@ export async function handleReplyEmail(c: AppContext) {
 	}
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	const now = new Date().toISOString();
+	const raw_headers = JSON.stringify([
+		{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
+		{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
+		...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
+		...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
+		{ key: "subject", value: subject },
+		{ key: "date", value: now },
+		{ key: "message-id", value: `<${outgoingMessageId}>` },
+		...(originalMsgId ? [{ key: "in-reply-to", value: `<${originalMsgId}>` }] : []),
+		...(references.length > 0 ? [{ key: "references", value: references.map((r: string) => `<${r}>`).join(" ") }] : []),
+	]);
 
-	const rateLimitError = await (stub as unknown as RateLimitStub)
-		.checkSendRateLimit();
-	if (rateLimitError) {
-		return c.json({ error: rateLimitError }, 429);
-	}
-
-	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
+	const result = await sendRecordedEmail({
+		env: c.env,
+		stub,
+		record: {
 			id: messageId,
 			subject,
 			sender: fromEmail,
 			recipient: toStr,
 			cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 			bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
-			date: new Date().toISOString(),
+			date: now,
 			body: html || text || "",
 			in_reply_to: originalMsgId,
 			email_references: JSON.stringify(references),
 			thread_id: thread_id,
 			message_id: outgoingMessageId,
-			raw_headers: JSON.stringify([
-				{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
-				{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
-				...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
-				...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
-				{ key: "subject", value: subject },
-				{ key: "date", value: new Date().toISOString() },
-				{ key: "message-id", value: `<${outgoingMessageId}>` },
-				...(originalMsgId ? [{ key: "in-reply-to", value: `<${originalMsgId}>` }] : []),
-				...(references.length > 0 ? [{ key: "references", value: references.map((r: string) => `<${r}>`).join(" ") }] : []),
-			]),
+			raw_headers,
 		},
-		attachmentData,
-	);
-
-	await stub.markThreadRead(thread_id);
-
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
+		email: {
 			to,
 			cc,
 			bcc,
@@ -104,12 +90,14 @@ export async function handleReplyEmail(c: AppContext) {
 				contentId: att.contentId,
 			})),
 			headers: buildThreadingHeaders(originalMsgId, references),
-		}).catch((e) => {
-			console.error("Deferred reply delivery failed:", (e as Error).message);
-		}),
-	);
+		},
+		attachments,
+		afterSent: () => stub.markThreadRead(thread_id).then(() => undefined),
+	});
 
-	return c.json({ id: messageId, status: "sent" }, 202);
+	if (result.status === "rate_limited") return c.json({ error: result.error }, 429);
+	if (result.status === "failed") return c.json({ id: messageId, status: "failed", error: result.error }, 502);
+	return c.json({ id: messageId, status: "sent" }, 201);
 }
 
 export async function handleForwardEmail(c: AppContext) {
@@ -136,45 +124,36 @@ export async function handleForwardEmail(c: AppContext) {
 	}
 
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
+	const now = new Date().toISOString();
+	const raw_headers = JSON.stringify([
+		{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
+		{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
+		...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
+		...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
+		{ key: "subject", value: subject },
+		{ key: "date", value: now },
+		{ key: "message-id", value: `<${outgoingMessageId}>` },
+	]);
 
-	const rateLimitError = await (stub as unknown as RateLimitStub)
-		.checkSendRateLimit();
-	if (rateLimitError) {
-		return c.json({ error: rateLimitError }, 429);
-	}
-
-	const attachmentData = await storeAttachments(c.env.BUCKET, messageId, attachments);
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
+	const result = await sendRecordedEmail({
+		env: c.env,
+		stub,
+		record: {
 			id: messageId,
 			subject,
 			sender: fromEmail,
 			recipient: toStr,
 			cc: cc ? (Array.isArray(cc) ? cc.join(", ") : cc).toLowerCase() : null,
 			bcc: bcc ? (Array.isArray(bcc) ? bcc.join(", ") : bcc).toLowerCase() : null,
-			date: new Date().toISOString(),
+			date: now,
 			body: html || text || "",
 			in_reply_to: null,
 			email_references: null,
 			thread_id: messageId,
 			message_id: outgoingMessageId,
-			raw_headers: JSON.stringify([
-				{ key: "from", value: typeof from === "string" ? from : `${from.name} <${from.email}>` },
-				{ key: "to", value: Array.isArray(to) ? to.join(", ") : to },
-				...(cc ? [{ key: "cc", value: Array.isArray(cc) ? cc.join(", ") : cc }] : []),
-				...(bcc ? [{ key: "bcc", value: Array.isArray(bcc) ? bcc.join(", ") : bcc }] : []),
-				{ key: "subject", value: subject },
-				{ key: "date", value: new Date().toISOString() },
-				{ key: "message-id", value: `<${outgoingMessageId}>` },
-			]),
+			raw_headers,
 		},
-		attachmentData,
-	);
-
-	c.executionCtx.waitUntil(
-		sendEmail(c.env.EMAIL, {
+		email: {
 			to,
 			cc,
 			bcc,
@@ -189,10 +168,11 @@ export async function handleForwardEmail(c: AppContext) {
 				disposition: att.disposition,
 				contentId: att.contentId,
 			})),
-		}).catch((e) => {
-			console.error("Deferred forward delivery failed:", (e as Error).message);
-		}),
-	);
+		},
+		attachments,
+	});
 
-	return c.json({ id: messageId, status: "sent" }, 202);
+	if (result.status === "rate_limited") return c.json({ error: result.error }, 429);
+	if (result.status === "failed") return c.json({ id: messageId, status: "failed", error: result.error }, 502);
+	return c.json({ id: messageId, status: "sent" }, 201);
 }

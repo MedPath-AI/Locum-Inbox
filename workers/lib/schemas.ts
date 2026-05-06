@@ -28,6 +28,8 @@ export interface EmailMetadata {
 	email_references?: string | null;
 	thread_id?: string | null;
 	folder_id?: string | null;
+	send_status?: SendStatus | null;
+	send_error?: string | null;
 	snippet?: string | null;
 }
 
@@ -37,6 +39,8 @@ export interface EmailFull extends EmailMetadata {
 	raw_headers?: string | null;
 	attachments?: AttachmentInfo[];
 }
+
+export type SendStatus = "queued" | "sending" | "sent" | "failed";
 
 export interface AttachmentInfo {
 	id: string;

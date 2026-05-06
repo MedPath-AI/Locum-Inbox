@@ -238,6 +238,13 @@ export default function EmailListRoute() {
 		return !email.read;
 	};
 
+	const sendStatusLabel = (email: Email): string | null => {
+		if (email.send_status === "failed") return "Failed";
+		if (email.send_status === "queued") return "Queued";
+		if (email.send_status === "sending") return "Sending";
+		return null;
+	};
+
 	const handleRowClick = (email: Email) => {
 		selectEmail(email.id);
 		if (mailboxId && hasUnread(email)) {
@@ -316,6 +323,7 @@ export default function EmailListRoute() {
 							{emails.map((email) => {
 								const isSelected = selectedEmailId === email.id;
 								const snippet = getSnippetText(email.snippet);
+								const statusLabel = sendStatusLabel(email);
 								return (
 									<div
 										key={email.id}
@@ -376,6 +384,13 @@ export default function EmailListRoute() {
 													<span className="shrink-0 text-xs text-kumo-destructive font-medium">
 														Draft
 													</span>
+												)}
+												{statusLabel && (
+													<Tooltip content={email.send_error || statusLabel} asChild>
+														<span className={`shrink-0 text-xs font-medium ${email.send_status === "failed" ? "text-kumo-destructive" : "text-kumo-warning"}`}>
+															{statusLabel}
+														</span>
+													</Tooltip>
 												)}
 												{email.needs_reply && !email.has_draft && (
 													<Tooltip content="Needs reply" asChild>

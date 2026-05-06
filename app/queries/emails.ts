@@ -112,7 +112,7 @@ export function useSendEmail() {
 			email,
 		}: { mailboxId: string; email: unknown }) =>
 			api.sendEmail(mailboxId, email),
-		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+		onSettled: (_data, _err, { mailboxId }) => invalidate(mailboxId),
 	});
 }
 
@@ -261,7 +261,7 @@ export function useReplyToEmail() {
 			email,
 		}: { mailboxId: string; emailId: string; email: unknown }) =>
 			api.replyToEmail(mailboxId, emailId, email),
-		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+		onSettled: (_data, _err, { mailboxId }) => invalidate(mailboxId),
 	});
 }
 
@@ -274,6 +274,6 @@ export function useForwardEmail() {
 			email,
 		}: { mailboxId: string; emailId: string; email: unknown }) =>
 			api.forwardEmail(mailboxId, emailId, email),
-		onSuccess: (_data, { mailboxId }) => invalidate(mailboxId),
+		onSettled: (_data, _err, { mailboxId }) => invalidate(mailboxId),
 	});
 }

@@ -27,7 +27,7 @@ import {
 	buildThreadingHeaders,
 } from "./email-helpers";
 import { verifyDraft } from "./ai";
-import { sendEmail } from "../email-sender";
+import { sendRecordedEmail } from "./send-service";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 
@@ -37,10 +37,6 @@ type MailboxSearchStub = {
 		query: string;
 		folder?: string;
 	}) => Promise<unknown>;
-};
-
-type RateLimitStub = {
-	checkSendRateLimit: () => Promise<string | null>;
 };
 
 // ── list_mailboxes ─────────────────────────────────────────────────
@@ -405,12 +401,6 @@ export async function toolSendReply(
 > {
 	const stub = getMailboxStub(env, mailboxId);
 
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
-
 	const originalEmail = (await stub.getEmail(params.originalEmailId)) as EmailFull | null;
 	if (!originalEmail) {
 		return { error: "Original email not found" };
@@ -433,27 +423,16 @@ export async function toolSendReply(
 	});
 	const fullBodyHtml = sanitizedBody + quotedBlock;
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: fullBodyHtml,
-			headers: buildThreadingHeaders(originalMsgId, references),
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send reply: ${(e as Error).message}` };
-	}
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
+	const now = new Date().toISOString();
+	const result = await sendRecordedEmail({
+		env,
+		stub,
+		record: {
 			id: messageId,
 			subject: params.subject,
 			sender: mailboxId.toLowerCase(),
 			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
+			date: now,
 			body: fullBodyHtml,
 			in_reply_to: originalMsgId,
 			email_references:
@@ -461,8 +440,17 @@ export async function toolSendReply(
 			thread_id: threadId,
 			message_id: outgoingMessageId,
 		},
-		[],
-	);
+		email: {
+			to: params.to,
+			from: mailboxId,
+			subject: params.subject,
+			html: fullBodyHtml,
+			headers: buildThreadingHeaders(originalMsgId, references),
+		},
+	});
+
+	if (result.status === "rate_limited") return { error: result.error };
+	if (result.status === "failed") return { error: `Failed to send reply: ${result.error}` };
 
 	return { status: "sent", messageId, message: `Reply sent to ${params.to}` };
 }
@@ -483,12 +471,6 @@ export async function toolSendEmail(
 > {
 	const stub = getMailboxStub(env, mailboxId);
 
-	// Check send rate limit
-	const rateLimitError = await (stub as unknown as RateLimitStub).checkSendRateLimit();
-	if (rateLimitError) {
-		return { error: rateLimitError };
-	}
-
 	const fromDomain = mailboxId.split("@")[1];
 	if (!fromDomain) throw new Error("Invalid mailbox email address");
 	const { messageId, outgoingMessageId } = generateMessageId(fromDomain);
@@ -498,34 +480,32 @@ export async function toolSendEmail(
 		return { error: "Draft verification failed — refusing to send unverified content. Please try again." };
 	}
 
-	try {
-		await sendEmail(env.EMAIL, {
-			to: params.to,
-			from: mailboxId,
-			subject: params.subject,
-			html: sanitizedBody,
-		});
-	} catch (e) {
-		console.error("Email send failed:", (e as Error).message);
-		return { error: `Failed to send email: ${(e as Error).message}` };
-	}
-
-	await stub.createEmail(
-		Folders.SENT,
-		{
+	const now = new Date().toISOString();
+	const result = await sendRecordedEmail({
+		env,
+		stub,
+		record: {
 			id: messageId,
 			subject: params.subject,
 			sender: mailboxId.toLowerCase(),
 			recipient: params.to.toLowerCase(),
-			date: new Date().toISOString(),
+			date: now,
 			body: sanitizedBody,
 			in_reply_to: null,
 			email_references: null,
 			thread_id: messageId,
 			message_id: outgoingMessageId,
 		},
-		[],
-	);
+		email: {
+			to: params.to,
+			from: mailboxId,
+			subject: params.subject,
+			html: sanitizedBody,
+		},
+	});
+
+	if (result.status === "rate_limited") return { error: result.error };
+	if (result.status === "failed") return { error: `Failed to send email: ${result.error}` };
 
 	return { status: "sent", messageId, message: `Email sent to ${params.to}` };
 }

@@ -10,6 +10,7 @@ import * as schema from "../db/schema";
 import { Folders } from "../../shared/folders";
 import type { Env } from "../types";
 import { applyMigrations, mailboxMigrations } from "./migrations";
+import type { SendStatus } from "../lib/schemas";
 
 /**
  * SQL expression to normalize email subjects by stripping common
@@ -87,6 +88,8 @@ interface EmailData {
 	thread_id?: string | null;
 	message_id?: string | null;
 	raw_headers?: string | null;
+	send_status?: SendStatus | null;
+	send_error?: string | null;
 }
 
 interface AttachmentData {
@@ -160,6 +163,8 @@ export class MailboxDO extends DurableObject<Env> {
 				email_references: schema.emails.email_references,
 				thread_id: schema.emails.thread_id,
 				folder_id: schema.emails.folder_id,
+				send_status: schema.emails.send_status,
+				send_error: schema.emails.send_error,
 				snippet: sql<string>`SUBSTR(${schema.emails.body}, 1, 300)`,
 			})
 			.from(schema.emails)
@@ -267,6 +272,7 @@ export class MailboxDO extends DurableObject<Env> {
 					lp.id, lp.subject, lp.sender, lp.recipient, lp.date,
 					lp.read, lp.starred, lp.thread_id, lp.folder_id,
 					lp.in_reply_to, lp.email_references,
+					lp.send_status, lp.send_error,
 					SUBSTR(lp.body, 1, 300) as snippet,
 					ds.thread_count, ds.thread_unread_count, ds.participants
 				FROM latest_per_group lp
@@ -355,6 +361,7 @@ export class MailboxDO extends DurableObject<Env> {
 				lif.id, lif.subject, lif.sender, lif.recipient, lif.date,
 				lif.read, lif.starred, lif.thread_id, lif.folder_id,
 				lif.in_reply_to, lif.email_references,
+				lif.send_status, lif.send_error,
 				SUBSTR(lif.body, 1, 300) as snippet,
 				cs.thread_count, cs.thread_unread_count, cs.participants,
 				CASE WHEN lmc.folder_id != (SELECT id FROM folders WHERE name = 'sent' LIMIT 1)
@@ -705,7 +712,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const query = `
 			SELECT e.id, e.subject, e.sender, e.recipient, e.cc, e.bcc, e.date,
 				e.read, e.starred, e.in_reply_to, e.email_references,
-				e.thread_id, e.folder_id,
+				e.thread_id, e.folder_id, e.send_status, e.send_error,
 				SUBSTR(e.body, 1, 300) as snippet,
 				f.name as folder_name
 			FROM emails e
@@ -794,6 +801,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const hourRow = [...this.ctx.storage.sql.exec(
 			`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
+			   AND (send_status IS NULL OR send_status IN ('queued', 'sending', 'sent', 'failed'))
 			   AND date >= datetime('now', '-1 hour')`,
 			Folders.SENT,
 		)][0] as { cnt: number } | undefined;
@@ -805,6 +813,7 @@ export class MailboxDO extends DurableObject<Env> {
 		const dayRow = [...this.ctx.storage.sql.exec(
 			`SELECT COUNT(*) as cnt FROM emails
 			 WHERE folder_id = ?1
+			   AND (send_status IS NULL OR send_status IN ('queued', 'sending', 'sent', 'failed'))
 			   AND date >= datetime('now', '-1 day')`,
 			Folders.SENT,
 		)][0] as { cnt: number } | undefined;
@@ -814,6 +823,18 @@ export class MailboxDO extends DurableObject<Env> {
 		}
 
 		return null;
+	}
+
+	async updateSendStatus(id: string, status: SendStatus, error?: string | null) {
+		this.db
+			.update(schema.emails)
+			.set({
+				send_status: status,
+				send_error: status === "failed" ? (error || "Unknown send error") : null,
+			})
+			.where(eq(schema.emails.id, id))
+			.run();
+		return this.getEmail(id);
 	}
 
 	// ── Email creation (Drizzle) ───────────────────────────────────
@@ -862,6 +883,8 @@ export class MailboxDO extends DurableObject<Env> {
 				thread_id: email.thread_id ?? null,
 				message_id: email.message_id ?? null,
 				raw_headers: email.raw_headers ?? null,
+				send_status: email.send_status ?? null,
+				send_error: email.send_error ?? null,
 			})
 			.run();
 
