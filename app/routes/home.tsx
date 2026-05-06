@@ -143,7 +143,7 @@ export default function HomeRoute() {
 			}))
 		: mailboxes;
 
-	const isLoading = !configData;
+	const isLoading = !configData || !mailboxesFetched;
 
 	return (
 		<div className="min-h-screen bg-kumo-recessed">
