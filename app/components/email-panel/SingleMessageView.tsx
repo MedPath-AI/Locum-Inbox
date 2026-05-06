@@ -4,7 +4,7 @@
 
 import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
-import { formatDetailDate, rewriteInlineImages } from "~/lib/utils";
+import { formatDetailDate, formatDisplayEmail, rewriteInlineImages } from "~/lib/utils";
 import type { Email } from "~/types";
 
 interface SingleMessageViewProps {
@@ -28,9 +28,9 @@ export default function SingleMessageView({
 						</div>
 						<div className="min-w-0">
 							<div className="text-sm font-medium text-kumo-default truncate">
-								{email.sender}
+								{formatDisplayEmail(email.sender)}
 							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+							<div className="text-xs text-kumo-subtle">To: {formatDisplayEmail(email.recipient)}</div>
 						</div>
 					</div>
 					<span className="text-xs text-kumo-subtle shrink-0">

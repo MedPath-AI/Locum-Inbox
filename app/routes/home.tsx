@@ -12,7 +12,7 @@ import {
 	Text,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { EnvelopeIcon, PlusIcon, SignOutIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
@@ -23,9 +23,10 @@ import {
 	useMailboxes,
 } from "~/queries/mailboxes";
 import { queryKeys } from "~/queries/keys";
+import { formatDisplayDomain, formatDisplayEmail } from "~/lib/utils";
 
 export function meta() {
-	return [{ title: "Agentic Inbox" }];
+	return [{ title: "Agentic Box for Locum Doctor Singapore" }];
 }
 
 export default function HomeRoute() {
@@ -128,12 +129,17 @@ export default function HomeRoute() {
 		}
 	};
 
+	const handleLogout = () => {
+		window.location.assign("/cdn-cgi/access/logout");
+	};
+
 	const isConfigured = emailAddresses.length > 0;
 	const accounts = isConfigured
 		? emailAddresses.map((addr) => ({
 				id: addr,
 				email: addr,
 				name: addr.split("@")[0] || addr,
+				settings: undefined,
 			}))
 		: mailboxes;
 
@@ -143,21 +149,30 @@ export default function HomeRoute() {
 		<div className="min-h-screen bg-kumo-recessed">
 			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
 				<div className="mb-8">
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between gap-3">
 						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
-						{!isConfigured && (
+						<div className="flex items-center gap-2">
+							{!isConfigured && (
+								<Button
+									variant="primary"
+									icon={<PlusIcon size={16} />}
+									onClick={() => setIsCreateOpen(true)}
+								>
+									New Mailbox
+								</Button>
+							)}
 							<Button
-								variant="primary"
-								icon={<PlusIcon size={16} />}
-								onClick={() => setIsCreateOpen(true)}
+								variant="secondary"
+								icon={<SignOutIcon size={16} />}
+								onClick={handleLogout}
 							>
-								New Mailbox
+								Log out
 							</Button>
-						)}
+						</div>
 					</div>
 					{domains.length > 0 && (
 						<p className="text-sm text-kumo-subtle mt-1">
-							{domains.join(", ")}
+							{domains.map(formatDisplayDomain).join(", ")}
 						</p>
 					)}
 				</div>
@@ -168,45 +183,48 @@ export default function HomeRoute() {
 					</div>
 				) : accounts.length > 0 ? (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
-						{accounts.map((account, idx) => (
-							<RouterLink
-								key={account.id}
-								to={`/mailbox/${account.id}`}
-								className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
-									idx > 0 ? "border-t border-kumo-line" : ""
-								}`}
-							>
-								<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
-									{account.name.charAt(0).toUpperCase()}
-								</div>
-								<div className="min-w-0 flex-1">
-									<div className="text-sm font-medium text-kumo-default truncate">
-										{account.name}
+						{accounts.map((account, idx) => {
+							const displayName = account.settings?.fromName || account.name;
+							return (
+								<RouterLink
+									key={account.id}
+									to={`/mailbox/${account.id}`}
+									className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
+										idx > 0 ? "border-t border-kumo-line" : ""
+									}`}
+								>
+									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
+										{displayName.charAt(0).toUpperCase()}
 									</div>
-									<div className="text-sm text-kumo-subtle">
-										{account.email}
+									<div className="min-w-0 flex-1">
+										<div className="text-sm font-medium text-kumo-default truncate">
+											{displayName}
+										</div>
+										<div className="text-sm text-kumo-subtle">
+											{formatDisplayEmail(account.email)}
+										</div>
 									</div>
-								</div>
-								{!isConfigured && (
-									<Button
-										variant="ghost"
-										size="sm"
-										shape="square"
-										icon={<TrashIcon size={16} />}
-										aria-label={`Delete mailbox ${account.email}`}
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											setMailboxToDelete({
-												id: account.id,
-												email: account.email,
-											});
-											setIsDeleteOpen(true);
-										}}
-									/>
-								)}
-							</RouterLink>
-						))}
+									{!isConfigured && (
+										<Button
+											variant="ghost"
+											size="sm"
+											shape="square"
+											icon={<TrashIcon size={16} />}
+											aria-label={`Delete mailbox ${formatDisplayEmail(account.email)}`}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												setMailboxToDelete({
+													id: account.id,
+													email: account.email,
+												});
+												setIsDeleteOpen(true);
+											}}
+										/>
+									)}
+								</RouterLink>
+							);
+						})}
 					</div>
 				) : (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
@@ -277,16 +295,16 @@ export default function HomeRoute() {
 									if (value) setSelectedDomain(value);
 								}}
 							>
-											{domains.map((d) => (
+													{domains.map((d) => (
 												<Select.Option key={d} value={d}>
-													{d}
+													{formatDisplayDomain(d)}
 												</Select.Option>
 											))}
 										</Select>
 									</div>
 								) : (
 									<span className="text-sm text-kumo-subtle">
-										{selectedDomain || "no domain"}
+										{selectedDomain ? formatDisplayDomain(selectedDomain) : "no domain"}
 									</span>
 								)}
 							</div>

@@ -7,6 +7,7 @@ import { RobotIcon, ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import { useMailbox, useUpdateMailbox } from "~/queries/mailboxes";
+import { formatDisplayEmail } from "~/lib/utils";
 
 // Placeholder shown in the textarea when no custom prompt is set.
 // The authoritative default prompt lives in workers/agent/index.ts (DEFAULT_SYSTEM_PROMPT).
@@ -80,7 +81,7 @@ export default function SettingsRoute() {
 							value={displayName}
 							onChange={(e) => setDisplayName(e.target.value)}
 						/>
-						<Input label="Email" type="email" value={mailbox.email} disabled />
+						<Input label="Email" value={formatDisplayEmail(mailbox.email)} disabled />
 					</div>
 				</div>
 

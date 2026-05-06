@@ -1,6 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "agentic-inbox",
+	"name": "locum-email",
+	"account_id": "8661f078947a4fa7b4e763f6f3155ed8",
 	"compatibility_date": "2025-11-28",
 	"main": "./workers/app.ts",
 	"observability": {
@@ -13,9 +14,16 @@
 		// Production deploys must also define POLICY_AUD and TEAM_DOMAIN.
 		// TEAM_DOMAIN may be the base Access URL or the full /cdn-cgi/access/certs URL.
 		// The worker now fails closed outside local development if Access is not configured.
-		"DOMAINS": "example.com",
+		"DOMAINS": "locumdoctor.sg",
+		"AUTO_DRAFT_ENABLED": "false",
 		"EMAIL_ADDRESSES": []
 	},
+	"routes": [
+		{
+			"pattern": "box.locumdoctor.sg",
+			"custom_domain": true
+		}
+	],
 	"send_email": [
 		{
 			"name": "EMAIL",
@@ -25,8 +33,8 @@
 	"r2_buckets": [
 		{
 			"binding": "BUCKET",
-			"bucket_name": "agentic-inbox",
-			"preview_bucket_name": "agentic-inbox"
+			"bucket_name": "locum-email",
+			"preview_bucket_name": "locum-email"
 		}
 	],
 	"ai": {

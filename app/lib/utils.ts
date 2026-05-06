@@ -21,6 +21,15 @@ export {
 /** @deprecated Use `formatQuotedDate` from `shared/dates` directly. */
 export const formatComposeDate = formatQuotedDate;
 
+export function formatDisplayDomain(domain: string): string {
+	if (domain.toLowerCase() === "locumdoctor.sg") return "LocumDoctor.sg";
+	return domain;
+}
+
+export function formatDisplayEmail(email: string): string {
+	return email.replace(/\blocumdoctor\.sg\b/gi, "LocumDoctor.sg");
+}
+
 /**
  * Format a byte count as a human-readable file size.
  */

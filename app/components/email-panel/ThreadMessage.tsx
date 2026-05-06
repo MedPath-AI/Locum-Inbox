@@ -15,6 +15,7 @@ import EmailAttachmentList from "~/components/EmailAttachmentList";
 import EmailIframe from "~/components/EmailIframe";
 import {
 	formatDetailDate,
+	formatDisplayEmail,
 	formatShortDate,
 	rewriteInlineImages,
 	stripHtml,
@@ -70,7 +71,7 @@ export default function ThreadMessage({
 }: ThreadMessageProps) {
 	const isSelf = email.sender === mailboxEmail;
 	const containerClassName = `${!isLast ? "border-b border-kumo-line" : ""} ${isDraft ? "border-l-2 border-l-kumo-warning bg-kumo-warning/[0.02]" : ""}`;
-	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : email.sender;
+	const senderLabel = isDraft ? "Draft reply" : isSelf ? "You" : formatDisplayEmail(email.sender);
 
 	if (!isExpanded) {
 		return (
@@ -122,7 +123,7 @@ export default function ThreadMessage({
 								</span>
 								{isDraft && <Badge variant="outline">Draft</Badge>}
 							</div>
-							<div className="text-xs text-kumo-subtle">To: {email.recipient}</div>
+							<div className="text-xs text-kumo-subtle">To: {formatDisplayEmail(email.recipient)}</div>
 						</div>
 					</div>
 					<div className="flex items-center gap-1 shrink-0">

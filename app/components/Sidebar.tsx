@@ -20,6 +20,7 @@ import { Folders, SYSTEM_FOLDER_IDS } from "shared/folders";
 import { useCreateFolder, useFolders } from "~/queries/folders";
 import { useMailbox } from "~/queries/mailboxes";
 import { useUIStore } from "~/hooks/useUIStore";
+import { formatDisplayEmail } from "~/lib/utils";
 
 const FOLDER_ICONS: Record<string, React.ReactNode> = {
 	[Folders.INBOX]: <TrayIcon size={18} weight="regular" />,
@@ -140,7 +141,7 @@ export default function Sidebar() {
 						{displayName}
 					</div>
 					<div className="text-sm text-kumo-subtle truncate mt-0.5">
-						{currentMailbox?.email || mailboxId}
+						{formatDisplayEmail(currentMailbox?.email || mailboxId || "")}
 					</div>
 				</div>
 			</div>
