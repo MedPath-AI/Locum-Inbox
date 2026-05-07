@@ -29,6 +29,15 @@ export function meta() {
 	return [{ title: "Agentic Box for Locum Doctor Singapore" }];
 }
 
+interface ProvisioningFailure {
+	email: string;
+	error: string;
+}
+
+function getErrorMessage(error: unknown) {
+	return error instanceof Error ? error.message : "Failed to create mailbox";
+}
+
 export default function HomeRoute() {
 	const toastManager = useKumoToastManager();
 	const { data: mailboxes = [], refetch: refetchMailboxes, isFetched: mailboxesFetched } = useMailboxes();
@@ -56,6 +65,12 @@ export default function HomeRoute() {
 		email: string;
 	} | null>(null);
 	const [isDeleting, setIsDeleting] = useState(false);
+	const [isProvisioning, setIsProvisioning] = useState(false);
+	const [provisioningEmails, setProvisioningEmails] = useState<string[]>([]);
+	const [provisioningFailures, setProvisioningFailures] = useState<
+		ProvisioningFailure[]
+	>([]);
+	const [provisioningRun, setProvisioningRun] = useState(0);
 
 	// Set default domain when config loads
 	useEffect(() => {
@@ -65,9 +80,8 @@ export default function HomeRoute() {
 	}, [domains, selectedDomain]);
 
 	// Auto-create mailboxes from config (run once when both data sources are ready)
-	const autoCreateDone = useRef(false);
+	const autoCreateKeyRef = useRef<string | null>(null);
 	useEffect(() => {
-		if (autoCreateDone.current) return;
 		if (emailAddresses.length === 0 || !mailboxesFetched) return;
 		const existingEmails = new Set(
 			mailboxes.map((m) => m.email.toLowerCase()),
@@ -75,20 +89,39 @@ export default function HomeRoute() {
 		const toCreate = emailAddresses.filter(
 			(addr) => !existingEmails.has(addr.toLowerCase()),
 		);
+		const createKey = [...toCreate].sort().join("|");
 		if (toCreate.length === 0) {
-			autoCreateDone.current = true;
+			autoCreateKeyRef.current = null;
+			setIsProvisioning(false);
+			setProvisioningEmails([]);
+			setProvisioningFailures([]);
 			return;
 		}
-		autoCreateDone.current = true;
+		if (autoCreateKeyRef.current === `${createKey}:${provisioningRun}`) return;
+		autoCreateKeyRef.current = `${createKey}:${provisioningRun}`;
 		let cancelled = false;
+		setIsProvisioning(true);
+		setProvisioningEmails(toCreate);
+		setProvisioningFailures([]);
 		Promise.all(
-			toCreate.map((addr) => {
+			toCreate.map(async (addr): Promise<ProvisioningFailure | null> => {
 				const localPart = addr.split("@")[0] || addr;
-				return api.createMailbox(addr, localPart).catch(() => {});
+				try {
+					await api.createMailbox(addr, localPart);
+					return null;
+				} catch (error) {
+					return { email: addr, error: getErrorMessage(error) };
+				}
 			}),
-		).then(() => { if (!cancelled) refetchMailboxes(); });
+		).then((results) => {
+			if (cancelled) return;
+			const failures = results.filter(Boolean) as ProvisioningFailure[];
+			setProvisioningFailures(failures);
+			setIsProvisioning(false);
+			refetchMailboxes();
+		});
 		return () => { cancelled = true; };
-	}, [emailAddresses, mailboxes, refetchMailboxes]);
+	}, [emailAddresses, mailboxes, mailboxesFetched, provisioningRun, refetchMailboxes]);
 
 	const handleCreate = async (e: FormEvent) => {
 		e.preventDefault();
@@ -181,6 +214,30 @@ export default function HomeRoute() {
 					<div className="flex justify-center py-20">
 						<Loader size="lg" />
 					</div>
+				) : isProvisioning ? (
+					<div className="rounded-xl border border-kumo-line bg-kumo-base py-16 px-6">
+						<div className="flex flex-col items-center text-center">
+							<div className="mb-4">
+								<Loader size="lg" />
+							</div>
+							<h3 className="text-base font-semibold text-kumo-default mb-1.5">
+								Provisioning mailboxes...
+							</h3>
+							<p className="text-sm text-kumo-subtle max-w-sm mb-4">
+								Creating {provisioningEmails.length} configured mailbox{provisioningEmails.length !== 1 ? "es" : ""}.
+							</p>
+							<div className="flex flex-wrap justify-center gap-2">
+								{provisioningEmails.map((email) => (
+									<span
+										key={email}
+										className="rounded-full bg-kumo-fill px-2.5 py-1 text-xs text-kumo-subtle"
+									>
+										{formatDisplayEmail(email)}
+									</span>
+								))}
+							</div>
+						</div>
+					</div>
 				) : accounts.length > 0 ? (
 					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
 						{accounts.map((account, idx) => {
@@ -240,10 +297,37 @@ export default function HomeRoute() {
 								No mailboxes yet
 							</h3>
 							<p className="text-sm text-kumo-subtle max-w-sm mb-5">
-								{isConfigured
+								{provisioningFailures.length > 0
+									? "Some configured mailboxes could not be created. Retry provisioning or check the errors below."
+									: isConfigured
 									? "Your email routing is configured but no mailboxes have been created yet. They will appear here automatically."
 									: "Create a mailbox to start sending and receiving emails with your domain."}
 							</p>
+							{provisioningFailures.length > 0 && (
+								<div className="mb-5 w-full max-w-md rounded-lg border border-kumo-line bg-kumo-recessed p-3 text-left">
+									{provisioningFailures.map((failure, idx) => (
+										<div
+											key={failure.email}
+											className={idx > 0 ? "mt-3 border-t border-kumo-line pt-3" : ""}
+										>
+											<div className="text-sm font-medium text-kumo-default">
+												{formatDisplayEmail(failure.email)}
+											</div>
+											<div className="mt-1 text-xs text-kumo-destructive">
+												{failure.error}
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+							{provisioningFailures.length > 0 && (
+								<Button
+									variant="primary"
+									onClick={() => setProvisioningRun((run) => run + 1)}
+								>
+									Retry Provisioning
+								</Button>
+							)}
 							{!isConfigured && (
 								<Button
 									variant="primary"
