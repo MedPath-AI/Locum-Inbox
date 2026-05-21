@@ -21,13 +21,13 @@
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
 	},
 	"dependencies": {
-		"@ai-sdk/react": "^3.0.177",
+		"@ai-sdk/react": "^3.0.191",
 		"@cloudflare/ai-chat": "^0.6.2",
 		"@cloudflare/codemode": "^0.3.4",
 		"@cloudflare/kumo": "^2.0.5",
 		"@phosphor-icons/react": "^2.1.10",
 		"@tanstack/ai": "^0.14.0",
-		"@tanstack/react-query": "^5.100.9",
+		"@tanstack/react-query": "^5.100.11",
 		"@tiptap/extension-color": "3.20.2",
 		"@tiptap/extension-highlight": "3.20.2",
 		"@tiptap/extension-image": "3.20.2",
@@ -39,23 +39,23 @@
 		"@tiptap/starter-kit": "3.20.2",
 		"@x402/core": "^2.11.0",
 		"@x402/evm": "^2.11.0",
-		"agents": "^0.12.3",
-		"ai": "^6.0.116",
-		"dompurify": "^3.4.2",
+		"agents": "^0.13.2",
+		"ai": "^6.0.189",
+		"dompurify": "^3.4.5",
 		"drizzle-orm": "^0.45.2",
 		"echarts": "^6.0.0",
 		"hono": "^4.12.18",
 		"isbot": "^5.1.27",
 		"jose": "^6.2.3",
 		"postal-mime": "^2.7.4",
-		"react": "^19.2.5",
-		"react-dom": "^19.2.5",
+		"react": "^19.2.6",
+		"react-dom": "^19.2.6",
 		"react-markdown": "^10.1.0",
-		"react-router": "^7.15.0",
+		"react-router": "^7.15.1",
 		"remark-gfm": "^4.0.1",
-		"workers-ai-provider": "^3.1.13",
+		"workers-ai-provider": "^3.1.14",
 		"zod": "^4.4.3",
-		"zustand": "^5.0.12"
+		"zustand": "^5.0.13"
 	},
 	"overrides": {
 		"@cloudflare/kumo": {
@@ -87,9 +87,9 @@
 		"@tiptap/extension-text": "3.20.2"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "^1.36.0",
-		"@cloudflare/workers-types": "^4.20251128.0",
-		"@react-router/dev": "^7.15.0",
+		"@cloudflare/vite-plugin": "^1.37.3",
+		"@cloudflare/workers-types": "^4.20260521.1",
+		"@react-router/dev": "^7.15.1",
 		"@tailwindcss/vite": "^4.2.4",
 		"@types/dompurify": "^3.0.5",
 		"@types/node": "^20.19.37",
@@ -97,7 +97,7 @@
 		"@types/react-dom": "^19.1.2",
 		"tailwindcss": "^4.1.4",
 		"typescript": "^5.8.3",
-		"vite": "^8.0.10",
-		"wrangler": "^4.88.0"
+		"vite": "^8.0.14",
+		"wrangler": "^4.93.1"
 	}
 }
