@@ -71,6 +71,12 @@
 			"new_sqlite_classes": [
 				"EmailMCP"
 			]
+		},
+		{
+			// Cloudflare recorded v4 during the failed EmailMCP cleanup deploy.
+			// Keep the tag aligned without replaying or deleting namespaces.
+			"tag": "v4",
+			"deleted_classes": []
 		}
 	]
 }
