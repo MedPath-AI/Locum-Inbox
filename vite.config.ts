@@ -8,6 +8,13 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
 export default defineConfig({
+  environments: {
+    ssr: {
+      build: {
+        sourcemap: true,
+      },
+    },
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tailwindcss(),

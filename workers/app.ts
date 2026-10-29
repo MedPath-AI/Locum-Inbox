@@ -3,30 +3,22 @@
 //     https://opensource.org/licenses/Apache-2.0
 
 import { routeAgentRequest } from "agents";
+import { env as workerEnv } from "cloudflare:workers";
 import { Hono } from "hono";
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import { createRequestHandler } from "react-router";
+import { createRequestHandler, RouterContextProvider } from "react-router";
 import { app as apiApp, receiveEmail } from "./index";
-import { EmailMCP } from "./mcp";
+import { createEmailMcpHandler } from "./mcp";
 import type { Env } from "./types";
 
 export { MailboxDO } from "./durableObject";
 export { EmailAgent } from "./agent";
-export { EmailMCP } from "./mcp";
-
-declare module "react-router" {
-	export interface AppLoadContext {
-		cloudflare: {
-			env: Env;
-			ctx: ExecutionContext;
-		};
-	}
-}
 
 const requestHandler = createRequestHandler(
 	() => import("virtual:react-router/server-build"),
 	import.meta.env.MODE,
 );
+const mcpHandler = createEmailMcpHandler(workerEnv as Env);
 
 function getAccessUrls(teamDomain: string) {
 	const certsPath = "/cdn-cgi/access/certs";
@@ -82,12 +74,19 @@ app.use("*", async (c, next) => {
 
 // MCP server endpoint — used by AI coding tools (ProtoAgent, Claude Code, Cursor, etc.)
 // Must be before API routes and React Router catch-all
-const mcpHandler = EmailMCP.serve("/mcp", { binding: "EMAIL_MCP" });
 app.all("/mcp", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
+	return mcpHandler(
+		c.req.raw,
+		c.env,
+		c.executionCtx as ExecutionContext,
+	);
 });
 app.all("/mcp/*", async (c) => {
-	return mcpHandler.fetch(c.req.raw, c.env, c.executionCtx as ExecutionContext);
+	return mcpHandler(
+		c.req.raw,
+		c.env,
+		c.executionCtx as ExecutionContext,
+	);
 });
 
 // Mount the API routes
@@ -102,9 +101,7 @@ app.all("/agents/*", async (c) => {
 
 // React Router catch-all: serves the SPA for all non-API routes
 app.all("*", (c) => {
-	return requestHandler(c.req.raw, {
-		cloudflare: { env: c.env, ctx: c.executionCtx as ExecutionContext },
-	});
+	return requestHandler(c.req.raw, new RouterContextProvider());
 });
 
 // Export the Hono app as the default export with an email handler
