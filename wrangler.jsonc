@@ -71,12 +71,6 @@
 			"new_sqlite_classes": [
 				"EmailMCP"
 			]
-		},
-		{
-			"tag": "v4",
-			"deleted_classes": [
-				"EmailMCP"
-			]
 		}
 	]
 }
