@@ -193,6 +193,7 @@ export default function HomeRoute() {
 								<Button
 									variant="primary"
 									size="sm"
+									className="text-[14px] font-medium"
 									icon={<PlusIcon size={16} />}
 									onClick={() => setIsCreateOpen(true)}
 								>
@@ -202,6 +203,7 @@ export default function HomeRoute() {
 							<Button
 								variant="secondary"
 								size="sm"
+								className="text-[14px] font-medium"
 								icon={<SignOutIcon size={16} />}
 								onClick={handleLogout}
 							>
@@ -210,7 +212,7 @@ export default function HomeRoute() {
 						</div>
 					</div>
 					{domains.length > 0 && (
-						<p className="text-sm text-kumo-subtle mt-1">
+						<p className="text-[14px] font-normal text-kumo-subtle mt-1">
 							{domains.map(formatDisplayDomain).join(", ")}
 						</p>
 					)}
@@ -259,14 +261,14 @@ export default function HomeRoute() {
 										to={`/mailbox/${account.id}`}
 										className="group flex min-w-0 flex-1 items-center gap-3 px-4 py-5 no-underline transition-colors hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-kumo-brand"
 									>
-									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kumo-fill text-sm font-semibold text-kumo-default">
+									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kumo-fill text-[14px] font-semibold text-kumo-default">
 										{displayName.charAt(0).toUpperCase()}
 									</div>
 									<div className="min-w-0 flex-1">
-										<div className="text-sm font-medium text-kumo-default truncate">
+										<div className="text-[14px] font-medium text-kumo-default truncate">
 											{displayName}
 										</div>
-										<div className="mt-0.5 break-all text-xs text-kumo-subtle">
+										<div className="mt-0.5 break-all text-[14px] font-normal text-kumo-subtle">
 											{formatDisplayEmail(account.email)}
 										</div>
 									</div>
