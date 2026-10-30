@@ -10,9 +10,10 @@ import {
 	Loader,
 	Select,
 	Text,
+	Tooltip,
 	useKumoToastManager,
 } from "@cloudflare/kumo";
-import { EnvelopeIcon, PlusIcon, SignOutIcon, TrashIcon } from "@phosphor-icons/react";
+import { ArrowRightIcon, EnvelopeIcon, PlusIcon, SignOutIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router";
@@ -60,6 +61,7 @@ export default function HomeRoute() {
 	const [isCreating, setIsCreating] = useState(false);
 	const [createError, setCreateError] = useState<string | null>(null);
 	const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+	const [deleteConfirmation, setDeleteConfirmation] = useState("");
 	const [mailboxToDelete, setMailboxToDelete] = useState<{
 		id: string;
 		email: string;
@@ -148,13 +150,15 @@ export default function HomeRoute() {
 	};
 
 	const handleDelete = async () => {
-		if (!mailboxToDelete) return;
+		if (!mailboxToDelete || isDeleting ||
+			deleteConfirmation.trim().toLowerCase() !== mailboxToDelete.email.toLowerCase()) return;
 		setIsDeleting(true);
 		try {
 			await deleteMailbox.mutateAsync(mailboxToDelete.id);
 			toastManager.add({ title: "Mailbox deleted" });
 			setIsDeleteOpen(false);
 			setMailboxToDelete(null);
+			setDeleteConfirmation("");
 		} catch {
 			toastManager.add({ title: "Failed to delete mailbox", variant: "error" });
 		} finally {
@@ -180,14 +184,15 @@ export default function HomeRoute() {
 
 	return (
 		<div className="min-h-screen bg-kumo-recessed">
-			<div className="mx-auto max-w-2xl px-4 py-8 md:px-6 md:py-16">
-				<div className="mb-8">
-					<div className="flex items-center justify-between gap-3">
-						<h1 className="text-2xl font-bold text-kumo-default">Mailboxes</h1>
+			<div className="mx-auto max-w-3xl px-4 py-8 md:px-6 md:py-12">
+				<div className="mb-6">
+					<div className="flex flex-wrap items-center justify-between gap-4">
+						<h1 className="text-xl font-semibold text-kumo-default">Mailboxes</h1>
 						<div className="flex items-center gap-2">
 							{!isConfigured && (
 								<Button
 									variant="primary"
+									size="sm"
 									icon={<PlusIcon size={16} />}
 									onClick={() => setIsCreateOpen(true)}
 								>
@@ -196,6 +201,7 @@ export default function HomeRoute() {
 							)}
 							<Button
 								variant="secondary"
+								size="sm"
 								icon={<SignOutIcon size={16} />}
 								onClick={handleLogout}
 							>
@@ -239,29 +245,35 @@ export default function HomeRoute() {
 						</div>
 					</div>
 				) : accounts.length > 0 ? (
-					<div className="rounded-xl border border-kumo-line bg-kumo-base overflow-hidden">
+					<div className="rounded-lg border border-kumo-line bg-kumo-base overflow-hidden">
 						{accounts.map((account, idx) => {
 							const displayName = account.settings?.fromName || account.name;
 							return (
-								<RouterLink
+								<div
 									key={account.id}
-									to={`/mailbox/${account.id}`}
-									className={`group flex items-center gap-4 px-5 py-4 no-underline transition-colors hover:bg-kumo-tint ${
+									className={`flex items-center gap-2 pr-3 ${
 										idx > 0 ? "border-t border-kumo-line" : ""
 									}`}
 								>
-									<div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-kumo-fill text-sm font-bold text-kumo-default">
+									<RouterLink
+										to={`/mailbox/${account.id}`}
+										className="group flex min-w-0 flex-1 items-center gap-3 px-4 py-5 no-underline transition-colors hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-kumo-brand"
+									>
+									<div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-kumo-fill text-sm font-semibold text-kumo-default">
 										{displayName.charAt(0).toUpperCase()}
 									</div>
 									<div className="min-w-0 flex-1">
 										<div className="text-sm font-medium text-kumo-default truncate">
 											{displayName}
 										</div>
-										<div className="text-sm text-kumo-subtle">
+										<div className="mt-0.5 break-all text-xs text-kumo-subtle">
 											{formatDisplayEmail(account.email)}
 										</div>
 									</div>
+									<ArrowRightIcon size={16} aria-hidden="true" className="shrink-0 text-kumo-subtle" />
+									</RouterLink>
 									{!isConfigured && (
+										<Tooltip content="Delete mailbox" side="top" asChild>
 										<Button
 											variant="ghost"
 											size="sm"
@@ -275,11 +287,13 @@ export default function HomeRoute() {
 													id: account.id,
 													email: account.email,
 												});
+														setDeleteConfirmation("");
 												setIsDeleteOpen(true);
 											}}
 										/>
+										</Tooltip>
 									)}
-								</RouterLink>
+								</div>
 							);
 						})}
 					</div>
@@ -426,8 +440,12 @@ export default function HomeRoute() {
 			<Dialog.Root
 				open={isDeleteOpen}
 				onOpenChange={(open) => {
+					if (isDeleting) return;
 					setIsDeleteOpen(open);
-					if (!open) setMailboxToDelete(null);
+					if (!open) {
+						setMailboxToDelete(null);
+						setDeleteConfirmation("");
+					}
 				}}
 			>
 				<Dialog size="sm" className="p-6">
@@ -435,16 +453,28 @@ export default function HomeRoute() {
 						Delete Mailbox
 					</Dialog.Title>
 					<Dialog.Description className="text-kumo-subtle text-sm mb-5">
-						Are you sure you want to delete{" "}
-						<strong className="text-kumo-default">
-							{mailboxToDelete?.email}
+						This action cannot be undone.
+						<strong className="mt-2 block break-all text-kumo-default">
+							{mailboxToDelete ? formatDisplayEmail(mailboxToDelete.email) : ""}
 						</strong>
-						? This action cannot be undone.
 					</Dialog.Description>
+					<label htmlFor="delete-mailbox-confirmation" className="mb-2 block text-sm text-kumo-default">
+						Type the mailbox email address to confirm
+					</label>
+					<Input
+						id="delete-mailbox-confirmation"
+						aria-label="Type the mailbox email address to confirm"
+						value={deleteConfirmation}
+						onChange={(event) => setDeleteConfirmation(event.target.value)}
+						autoComplete="off"
+						spellCheck={false}
+						disabled={isDeleting}
+						className="mb-5 w-full"
+					/>
 					<div className="flex justify-end gap-2">
 						<Dialog.Close
 							render={(props) => (
-								<Button {...props} variant="secondary" size="sm">
+								<Button {...props} variant="secondary" size="sm" disabled={isDeleting}>
 									Cancel
 								</Button>
 							)}
@@ -453,9 +483,10 @@ export default function HomeRoute() {
 							variant="destructive"
 							size="sm"
 							loading={isDeleting}
+							disabled={isDeleting || !mailboxToDelete || deleteConfirmation.trim().toLowerCase() !== mailboxToDelete.email.toLowerCase()}
 							onClick={handleDelete}
 						>
-							Delete
+							Delete mailbox
 						</Button>
 					</div>
 				</Dialog>
